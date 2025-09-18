@@ -1,0 +1,43 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+title Контекстная диаграмма (MVP открытия депозитов)
+
+Person(client_person, "Клиент", "Клиент банка")
+Person(manager_person, "Менеджер бэк офиса")
+Person(operator_person, "Оператор кол-центра")
+Person(operator_person_ext, "Оператор внешнего кол-центра")
+
+System_Boundary(bank_system, "Система банка «Стандарт»") {
+    System(site, "Сайт", "Веб приложение для демонстрации маркетинговой информации и подачи заявок")
+    System(internet_bank, "Интернет-банк", "Веб приложение для клиентов банка")
+    System(abs, "АБС", "Автоматизированная банковская система")
+    System(call_center, "Система кол-центра", "Управление обращениями клиентов")
+    System(sms_gateway, "СМС-шлюз", "Сервис отправки смс сообщений")
+}
+
+System_Ext(call_center_ext, "Система партнерского кол-центра", "Управление обращениями клиентов")
+System_Ext(telecom_operator, "Телеком оператор")
+
+Rel(client_person, site, "Подача заявки", "HTTPS/TLS")
+Rel(client_person, internet_bank, "Открытие депозита", "HTTPS/TLS")
+
+Rel(site, abs, "Заявка на создание депозита", "HTTPS/TLS")
+Rel(internet_bank, abs, "Операция открытие депозита", "HTTPS/TLS")
+
+Rel(call_center, abs, "Заявка на создание депозита", "HTTPS/TLS")
+
+Rel(abs, sms_gateway, "Запрос на отправку смс сообщения со статусом операции с депозитом", "HTTPS/TLS")
+Rel(sms_gateway, telecom_operator, "Запрос на отправку СМС сообщения")
+Rel(telecom_operator, client_person, "Доставка СМС сообщения")
+
+Rel(client_person, operator_person, "Создание заявки на депозит")
+Rel(operator_person, call_center, "Заявка на создание депозита")
+
+Rel(manager_person, abs, "Обработка заявок")
+
+Rel(call_center_ext, call_center, "Запрос скриптов звонков")
+Rel(operator_person_ext, call_center_ext, "Запрос информации по звонкам")
+Rel(operator_person_ext, client_person, "Обзвон по имеющимся скриптам")
+
+@enduml

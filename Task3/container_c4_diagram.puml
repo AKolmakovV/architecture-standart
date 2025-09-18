@@ -1,0 +1,101 @@
+@startuml
+
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title Диаграмма контейнеров (MVP открытия депозитов)
+
+Person(client_person, "Клиент", "Клиент банка")
+Person(operator_person, "Оператор кол-центра")
+Person(admin, "Администратор", "Член команды DevOps/SRE")
+
+System_Boundary(bank_system, "Система банка «Стандарт»") {
+    System(sms_gateway, "СМС-шлюз", "Сервис отправки смс сообщений")
+
+    Container_Boundary(abs, "АБС", ) {
+        Container(abs_client_container, "Автоматизированная банковская система (Клиент)", "Delphi")
+        ContainerDb(abs_db_container, "Автоматизированная банковская система (БД)", "Oracle")
+    }
+
+    Container(site, "Сайт", "PHP + React.js")
+
+    Container_Boundary(internet_bank, "Интернет-банк") {
+        Container(internet_bank_web_client_container, "Интернет-банк (Клиент)", "ASP.Net")
+        ContainerDb(internet_bank_db_container, "Интернет-банк (БД)", "MSSQL")
+    }
+
+    Container_Boundary(call_center, "Кол-центр") {
+        Container(call_center_client_container, "Кол-центр (Клиент)", "React.JS")
+        Container(call_center_server_container, "Кол-центр (Сервер)", "Java Spring Boot")
+        ContainerDb(call_center_db_container, "Кол-центр (БД)", "PostgreSQL")
+    }
+
+    Container_Boundary(depositService, "Сервис работы с депозитами") {
+        Container(deposit_service_container, "Микро-сервис работы с депозитами", "Java")
+        ContainerDb(deposit_service_db_container, "БД сервиса работы с депозитами (БД)", "MSSQL")
+    }
+
+    Container(message_bus, "Шина сообщений", "Kafka")
+    Container(load_balancer, "Load Balancer")
+
+    Container(prometheus, "Prometheus", "Prometheus", "")
+    Container(logs_collector, "OpenTelemetry Collector", "OpenTelemetry Collector", "Собирает данные о логировании")
+    Container(grafana, "Grafana", "Grafana", "Визуализация данных и алертинг Источники: Prometheus, Loki")
+    Container(jaeger, "Jaeger", "Jaeger", "Принимает, хранит и отображает трассировки")
+}
+
+System_Ext(telecom_operator, "Телеком оператор")
+
+' --- Связи Клиента ---
+Rel(client_person, operator_person, "Создание заявки на депозит")
+
+Rel(client_person, load_balancer, "Подача заявки", "HTTPS/TLS")
+Rel(client_person, load_balancer, "Открытие депозита", "HTTPS/TLS")
+
+Rel(load_balancer, site, "Подача заявки")
+Rel(load_balancer, internet_bank_web_client_container, "Открытие депозита")
+
+
+' --- Связи Интернет банка ---
+
+Rel(internet_bank_web_client_container, internet_bank_db_container, "")
+Rel(internet_bank_web_client_container, message_bus, "Операция открытие депозита")
+
+' --- Связи сайта ---
+
+Rel(site, message_bus, "Заявка на создание депозита")
+
+' --- Кол центра ---
+
+Rel(call_center_server_container, message_bus, "Заявка на создание депозита")
+Rel(call_center_client_container, call_center_server_container, "")
+Rel(call_center_server_container, call_center_db_container, "")
+Rel(telecom_operator, client_person, "Доставка СМС сообщения")
+Rel(operator_person, call_center_client_container, "Заявка на создание депозита", "HTTPS/TLS")
+
+' --- Связи АБС  ---
+
+Rel(abs_client_container, sms_gateway, "Запрос на отправку смс сообщения со статусом операции с депозитом")
+Rel(abs_client_container, deposit_service_container, "Данные по депозитам")
+Rel(abs_client_container, abs_db_container, "")
+Rel(sms_gateway, telecom_operator, "Запрос на отправку СМС сообщения") 
+
+' --- Связи Визуализации ---
+
+Rel(grafana, prometheus, "Запрашивает метрики")
+Rel(prometheus, logs_collector, "Запрашивает логи")
+Rel(grafana, jaeger, "Запрашивает трассировки")
+Rel(jaeger, logs_collector, "Запрашивает трассировки")
+
+' --- Связь Администратора с системой ---
+
+Rel(admin, grafana, "Смотрит дашборды\nНастраивает алерты", "HTTPS/TLS")
+
+' --- Сервис работы с депозитами ---
+
+Rel(message_bus, deposit_service_container, "Операции с депозитами")
+
+Rel(deposit_service_container, deposit_service_db_container, "")
+Rel(deposit_service_container, abs_db_container, "")
+Rel(deposit_service_container, sms_gateway, Запрос на отправку смс сообщения со статусом операции с депозитом)
+
+@enduml

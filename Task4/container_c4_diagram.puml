@@ -1,0 +1,53 @@
+@startuml
+
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title Диаграмма контейнеров (MVP открытия депозитов)
+
+Person(client_person, "Клиент", "Клиент банка")
+Person(operator_person, "Оператор кол-центра")
+Person(operator_person_ext, "Оператор внешнего кол-центра")
+
+
+System_Boundary(bank_system, "Система банка «Стандарт»") {
+    Container_Boundary(call_center, "Кол-центр") {
+        Container(call_center_client_container, "Кол-центр (Клиент)", "React.JS")
+        Container(call_center_server_container, "Кол-центр (Сервер)", "Java Spring Boot")
+        ContainerDb(call_center_db_container, "Кол-центр (БД)", "PostgreSQL")
+    }
+
+    Container_Boundary(depositService, "Сервис работы с депозитами") {
+        Container(deposit_service_container, "Микро-сервис работы с депозитами", "Java")
+        ContainerDb(deposit_service_db_container, "БД сервиса работы с депозитами (БД)", "MSSQL")
+    }
+
+    Container(message_bus, "Шина сообщений", "Kafka")
+    Container(s3_file_storage, "S3 Storage", "MinIO")
+}
+
+System_Ext(call_center_ext, "Система партнерского кол-центра", "Управление обращениями клиентов")
+
+Rel(client_person, call_center_server_container, "Звонок в банк")
+
+' --- Кол центра ---
+
+Rel(call_center_server_container, message_bus, "Подписка на актуальные ставки")
+Rel(call_center_client_container, call_center_server_container, "Звонки/Текущие ставки")
+Rel(call_center_server_container, call_center_db_container, "")
+Rel(operator_person, call_center_client_container, "Обработка звонка/Запрос ставок", "HTTPS/TLS")
+
+' --- Внешний кол центр ---
+
+Rel(operator_person_ext, call_center_ext, "Обработка звонков")
+Rel(call_center_ext, call_center_server_container, "Получение входящих звонков")
+Rel(operator_person_ext, s3_file_storage, "Получение файла с актуальными ставками")
+
+' --- Сервис работы с депозитами ---
+
+Rel(message_bus, deposit_service_container, "[Информация по ставкам]")
+
+Rel(deposit_service_container, deposit_service_db_container, "")
+Rel(deposit_service_container, s3_file_storage, "Публикует файл с актуальными ставками")
+
+
+@enduml
